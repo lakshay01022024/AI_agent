@@ -1,0 +1,19 @@
+{
+  "name": "ai-cold-outreach-agent",
+  "version": "1.0.0",
+  "description": "AI-powered cold outreach agent with personalized email generation and Gmail delivery",
+  "type": "module",
+  "main": "run.js",
+  "scripts": {
+    "start": "node run.js",
+    "dev": "node --watch run.js"
+  },
+  "keywords": ["ai", "outreach", "agent", "openai", "gmail"],
+  "license": "MIT",
+  "dependencies": {
+    "csv-parser": "^3.0.0",
+    "dotenv": "^16.4.7",
+    "googleapis": "^144.0.0",
+    "openai": "^4.77.0"
+  }
+}
