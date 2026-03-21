@@ -3,7 +3,11 @@
 // Defines the outreach agent and its orchestration logic
 // ============================================================
 
+import { EventEmitter } from "events";
 import { readLeads, generateMessage, sendEmailTool } from "./tools.js";
+
+// Global event emitter for Web UI integration
+export const agentEvents = new EventEmitter();
 
 // ── Agent Configuration ─────────────────────────────────────
 const agent = {
@@ -38,17 +42,26 @@ function randomDelay(minSec, maxSec) {
 }
 
 // ── Utility: styled console logging ─────────────────────────
-function log(icon, message) {
+function log(icon, message, type = "info") {
   const timestamp = new Date().toLocaleTimeString("en-US", { hour12: false });
-  console.log(`  ${icon}  [${timestamp}] ${message}`);
+  const formatted = `  ${icon}  [${timestamp}] ${message}`;
+  
+  // CLI exact formatting
+  if (type === "error") console.error(formatted);
+  else console.log(formatted);
+
+  // Emit structured event for Web UI
+  agentEvents.emit("log", { timestamp, icon, message, type });
+}
+
+// Emits raw terminal output to web UI that isn't formatted by `log()`
+function logRaw(message) {
+  console.log(message);
+  agentEvents.emit("raw", { message });
 }
 
 /**
  * Prioritize leads — high-value companies bubble to the top.
- *
- * @param {Array} leads
- * @param {Array<string>} priorityCompanies
- * @returns {Array} Sorted leads array
  */
 function prioritizeLeads(leads, priorityCompanies) {
   const normalize = (str) => str.toLowerCase().trim();
@@ -69,17 +82,21 @@ function prioritizeLeads(leads, priorityCompanies) {
  * This is the main orchestration loop that drives the entire workflow.
  *
  * @param {Object} agentDef — The agent definition object
+ * @param {Object} overrideConfig - Config overrides from Web UI
  */
-export async function executeAgent(agentDef = agent) {
-  const { config, tools } = agentDef;
+export async function executeAgent(agentDef = agent, overrideConfig = {}) {
+  const tools = agentDef.tools;
+  const config = { ...agentDef.config, ...overrideConfig };
 
-  console.log("\n╔══════════════════════════════════════════════════╗");
-  console.log("║        🤖  AI Cold Outreach Agent v1.0          ║");
-  console.log("╚══════════════════════════════════════════════════╝\n");
+  agentEvents.emit("start", { config });
+
+  logRaw("\n╔══════════════════════════════════════════════════╗");
+  logRaw("║        🤖  AI Cold Outreach Agent v1.0          ║");
+  logRaw("╚══════════════════════════════════════════════════╝\n");
 
   log("📋", `Agent: ${agentDef.name}`);
   log("🎯", `Goal: ${agentDef.goal}`);
-  console.log("");
+  logRaw("");
 
   // ── Step 1: Load leads ──────────────────────────────────
   log("🔍", "Reading leads from CSV...");
@@ -87,7 +104,8 @@ export async function executeAgent(agentDef = agent) {
   try {
     leads = await tools.readLeads();
   } catch (err) {
-    log("❌", `Failed to read leads: ${err.message}`);
+    log("❌", `Failed to read leads: ${err.message}`, "error");
+    agentEvents.emit("end", { success: false, error: err.message });
     return;
   }
   log("✅", `Loaded ${leads.length} leads from data source`);
@@ -108,7 +126,7 @@ export async function executeAgent(agentDef = agent) {
   // ── Step 3: Cap at max per run ──────────────────────────
   const batch = leads.slice(0, config.maxLeadsPerRun);
   log("📊", `Processing ${batch.length} of ${leads.length} leads (max ${config.maxLeadsPerRun} per run)`);
-  console.log("\n" + "─".repeat(52) + "\n");
+  logRaw("\n" + "─".repeat(52) + "\n");
 
   // ── Step 4: Process each lead ───────────────────────────
   let successCount = 0;
@@ -120,21 +138,24 @@ export async function executeAgent(agentDef = agent) {
       (c) => c.toLowerCase() === lead.company.toLowerCase()
     );
 
-    console.log(`  ┌─── Lead ${i + 1}/${batch.length} ${isPriority ? "⭐ HIGH PRIORITY" : ""}`);
-    console.log(`  │  Name:    ${lead.name}`);
-    console.log(`  │  Email:   ${lead.email}`);
-    console.log(`  │  Company: ${lead.company}`);
-    console.log(`  │  Role:    ${lead.role || "N/A"}`);
+    logRaw(`  ┌─── Lead ${i + 1}/${batch.length} ${isPriority ? "⭐ HIGH PRIORITY" : ""}`);
+    logRaw(`  │  Name:    ${lead.name}`);
+    logRaw(`  │  Email:   ${lead.email}`);
+    logRaw(`  │  Company: ${lead.company}`);
+    logRaw(`  │  Role:    ${lead.role || "N/A"}`);
+
+    // Update UI state
+    agentEvents.emit("progress", { current: i + 1, total: batch.length, lead });
 
     // ── Generate personalized message ───────────────────
     try {
       log("💭", "Thinking... crafting personalized message...");
-      log("✍️ ", "Generating message with AI...");
+      log("✍️", "Generating message with AI...");
 
       const { subject, body } = await tools.generateMessage(lead);
 
-      console.log(`  │  Subject: "${subject}"`);
-      console.log(`  │`);
+      logRaw(`  │  Subject: "${subject}"`);
+      logRaw(`  │`);
 
       // ── Send email ────────────────────────────────────
       log("📤", "Sending email via Gmail...");
@@ -145,10 +166,10 @@ export async function executeAgent(agentDef = agent) {
         message: body,
       });
 
-      log("✅", `Email sent successfully to ${lead.email}`);
+      log("✅", `Email sent successfully to ${lead.email}`, "success");
       successCount++;
     } catch (err) {
-      log("❌", `Failed for ${lead.name}: ${err.message}`);
+      log("❌", `Failed for ${lead.name}: ${err.message}`, "error");
       failCount++;
     }
 
@@ -158,19 +179,21 @@ export async function executeAgent(agentDef = agent) {
         Math.floor(Math.random() * (config.maxDelaySec - config.minDelaySec + 1)) +
         config.minDelaySec;
       log("⏳", `Waiting ${delaySec}s before next send (anti-spam delay)...`);
-      await randomDelay(config.minDelaySec, config.maxDelaySec);
+      await randomDelay(delaySec, delaySec); // Fixed signature to force exact delay
     }
 
-    console.log("  └" + "─".repeat(50) + "\n");
+    logRaw("  └" + "─".repeat(50) + "\n");
   }
 
   // ── Summary ─────────────────────────────────────────────
-  console.log("═".repeat(52));
+  logRaw("═".repeat(52));
   log("📊", "Run Complete!");
-  log("✅", `Sent: ${successCount}`);
-  log("❌", `Failed: ${failCount}`);
+  log("✅", `Sent: ${successCount}`, "success");
+  log("❌", `Failed: ${failCount}`, "error");
   log("📋", `Total Processed: ${batch.length}`);
-  console.log("═".repeat(52) + "\n");
+  logRaw("═".repeat(52) + "\n");
+
+  agentEvents.emit("end", { successCount, failCount, total: batch.length });
 }
 
 export default agent;

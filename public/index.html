@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Cold Outreach Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  
+  <div class="background-globes">
+    <div class="globe globe-1"></div>
+    <div class="globe globe-2"></div>
+    <div class="globe globe-3"></div>
+  </div>
+
+  <main class="dashboard-container">
+    
+    <!-- Sidebar / Config Header -->
+    <header class="glass-panel header-panel">
+      <div class="brand">
+        <div class="logo">🤖</div>
+        <div>
+          <h1>AI Outreach Agent</h1>
+          <p class="subtitle">GPT-4o-mini powered cold email scale</p>
+        </div>
+      </div>
+
+      <div class="config-section">
+        <h3>Configuration</h3>
+        
+        <div class="input-group">
+          <label for="maxLeads">Max Leads per Run</label>
+          <input type="number" id="maxLeads" value="10" min="1" max="100">
+          <span class="help-text">Limits API usage and protects sender reputation.</span>
+        </div>
+
+        <div class="status-indicator" id="statusIndicator">
+          <span class="dot"></span>
+          <span id="statusText">Agent is Idle</span>
+        </div>
+
+        <button id="startBtn" class="btn-primary">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+          Start Outreach
+        </button>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span class="stat-label">Processed</span>
+          <span class="stat-value" id="statProcessed">0 <span class="dim">/ 0</span></span>
+        </div>
+        <div class="stat-card success-stat">
+          <span class="stat-label">Sent</span>
+          <span class="stat-value" id="statSent">0</span>
+        </div>
+        <div class="stat-card error-stat">
+          <span class="stat-label">Failed</span>
+          <span class="stat-value" id="statFailed">0</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Live Terminal -->
+    <section class="glass-panel terminal-panel">
+      <div class="terminal-header">
+        <div class="mac-controls">
+          <span></span><span></span><span></span>
+        </div>
+        <div class="terminal-title">agent.js execution logs</div>
+        <div class="pulse-ring display-none" id="livePulse"></div>
+      </div>
+      
+      <div class="terminal-body" id="terminal">
+        <div class="log-line text-dim">Connecting to agent server...</div>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
